@@ -1,0 +1,9 @@
+Package: com.beeper.beepserv-trollstore
+Name: beepserv-trollstore
+Version: 0.2.0
+Architecture: iphoneos-arm
+Description: Use your iPhone to register your Beeper Mini's phone number with Apple!
+Maintainer: James Gill, June Welker, beepserv contributors
+Author: James Gill, June Welker, beepserv contributors
+Section: Applications
+Depends: firmware (>= 10.0)

@@ -11,23 +11,23 @@ static NSDictionary* cachedIdentifiers;
         if (!cachedIdentifiers) {
             [self cache];
         }
-        
+
         return cachedIdentifiers;
     }
-    
+
     + (void) cache {
         struct utsname systemInfo;
         uname(&systemInfo);
-        
+
         NSString* model = [NSString stringWithCString: systemInfo.machine encoding: NSUTF8StringEncoding];
-        
+
         size_t malloc_size = 10;
         char* buildNumberBuf = malloc(malloc_size);
         sysctlbyname("kern.osversion\0", (void*) buildNumberBuf, &malloc_size, NULL, 0);
-        
+
         // we don't need to free `buildNumberBuf` if we pass it into this method
         NSString* buildNumber = [NSString stringWithCString: buildNumberBuf encoding: NSUTF8StringEncoding];
-        
+
         cachedIdentifiers = @{
             @"hardware_version": model,
             @"software_name": @"iPhone OS",

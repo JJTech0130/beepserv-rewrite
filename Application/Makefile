@@ -17,8 +17,16 @@ include $(THEOS)/makefiles/common.mk
 
 APPLICATION_NAME = BeepservApplication
 
-$(APPLICATION_NAME)_FILES = $(wildcard *.m) ../Shared/BPState.m ../Shared/Logging.m ../Shared/BPPrefs.m
+$(APPLICATION_NAME)_FILES = $(wildcard *.m) ../Shared/BPState.m ../Shared/Logging.m ../Shared/BPPrefs.m ../Shared/bp_ids_generate_with_offsets.m ../Shared/bp_ids_offset_utils.m ../Shared/dylibify/obj-c/dylibify.m
 $(APPLICATION_NAME)_FRAMEWORKS = UIKit CoreGraphics
 $(APPLICATION_NAME)_CFLAGS = -fobjc-arc
+$(APPLICATION_NAME)_CODESIGN_FLAGS = -S./entitlements.plist
 
 include $(THEOS_MAKE_PATH)/application.mk
+
+after-package::
+	mkdir -p Payload
+	cp -r "$(THEOS_OBJ_DIR)/BeepservApplication.app" ./Payload/
+	rm ./packages/BeepservApplication_$(THEOS_PACKAGE_BASE_VERSION).tipa || :
+	ditto -c -k --sequesterRsrc --keepParent ./Payload ./packages/BeepservApplication_$(THEOS_PACKAGE_BASE_VERSION).tipa
+	rm -r Payload

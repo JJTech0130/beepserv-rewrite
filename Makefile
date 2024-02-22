@@ -26,9 +26,9 @@ before-all::
 	cd SocketRocket && git apply -q ../SocketRocket.patch || :
 
 after-install::
-		install.exec "uicache -a"
-		install.exec "sbreload"
-		
+	install.exec "uicache -a"
+	install.exec "sbreload"
+
 after-stage::
 ifeq ($(THEOS_PACKAGE_SCHEME),rootless)
 	$(ECHO_NOTHING) rm $(THEOS_STAGING_DIR)/Library/LaunchDaemons/com.beeper.beepservd-rootful.plist $(ECHO_END)

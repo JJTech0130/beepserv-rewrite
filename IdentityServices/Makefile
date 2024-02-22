@@ -17,7 +17,7 @@ INSTALL_TARGET_PROCESSES = identityservicesd
 
 TWEAK_NAME = BeepservIdentityServices
 
-$(TWEAK_NAME)_FILES = $(wildcard *.x) ../Shared/BPTimer.m ../Shared/Logging.m
+$(TWEAK_NAME)_FILES = $(wildcard *.x) ../Shared/BPTimer.m ../Shared/Logging.m ../Shared/bp_ids_offset_utils.m ../Shared/dylibify/obj-c/dylibify.m
 $(TWEAK_NAME)_CFLAGS = -fobjc-arc
 $(TWEAK_NAME)_LIBRARIES = MobileGestalt
 

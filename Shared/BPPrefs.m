@@ -10,27 +10,27 @@ void bp_log_impl(NSString* moduleName, NSString* logString);
 @implementation BPPrefs
     + (BOOL) shouldShowNotifications {
         NSURL* url = [NSURL URLWithString: [NSString stringWithFormat: @"file://%@", kPrefsFilePath]];
-        
+
         NSDictionary* prefsDict;
-        
+
         if (@available(iOS 11, *)) {
             prefsDict = [NSDictionary dictionaryWithContentsOfURL: url error: nil];
         } else {
             prefsDict = [NSDictionary dictionaryWithContentsOfURL: url];
         }
-        
+
         return (prefsDict && prefsDict[kPrefsKeyShouldShowNotifications])
             ? [(NSNumber*) prefsDict[kPrefsKeyShouldShowNotifications] boolValue]
             : true;
     }
-    
+
     + (void) setShouldShowNotifications:(BOOL)shouldShowNotificationsFromNowOn {
         NSError* writingError;
         NSURL* url = [NSURL URLWithString: [NSString stringWithFormat: @"file://%@", kPrefsFilePath]];
         NSDictionary* prefsDict = @{
             kPrefsKeyShouldShowNotifications: [NSNumber numberWithBool: shouldShowNotificationsFromNowOn]
         };
-        
+
         if (@available(iOS 11, *)) {
             [prefsDict writeToURL: url error: &writingError];
         } else {
@@ -40,7 +40,7 @@ void bp_log_impl(NSString* moduleName, NSString* logString);
                 }];
             }
         }
-        
+
         if (writingError) {
             LOG(@"Writing whether notifications should be shown to disk failed with error: %@", writingError);
         }

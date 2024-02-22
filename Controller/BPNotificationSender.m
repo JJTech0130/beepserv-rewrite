@@ -8,9 +8,9 @@
         if (![BPPrefs shouldShowNotifications]) {
             return;
         }
-        
+
         LOG(@"Telling the NotificationHelper to send a notification bulletin");
-        
+
         // Tell the NotificationHelper to send a notification bulletin
         [NSDistributedNotificationCenter.defaultCenter
             postNotificationName: kNotificationSendNotificationBulletin

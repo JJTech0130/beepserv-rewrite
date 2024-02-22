@@ -8,9 +8,9 @@
 
 @interface BBServer (beepserv)
     - (void) publishBulletin:(BBBulletin*)bulletin destinations:(unsigned long long)destinations;
-    
+
     - (void) publishBulletin:(BBBulletin*)bulletin destinations:(unsigned long long)destinations alwaysToLockScreen:(bool)alwaysToLockScreen;
-    
+
     - (id) _sectionInfoForSectionID:(NSString*)sectionID effective:(BOOL)effective;
 @end
 
@@ -29,25 +29,25 @@ static NSObject<OS_dispatch_queue>* notificationServerQueue = nil;
     - (instancetype) initWithQueue:(id)queue {
         notificationServer = %orig;
         notificationServerQueue = queue;
-        
+
         return notificationServer;
     }
-    
+
     - (id) initWithQueue:(id)queue dataProviderManager:(id)dataProviderManager syncService:(id)syncService dismissalSyncCache:(id)dismissalSyncCache observerListener:(id)observerListener utilitiesListener:(id)utilitiesListener conduitListener:(id)conduitListener systemStateListener:(id)systemStateListener settingsListener:(id)settingsListener {
         notificationServer = %orig;
         notificationServerQueue = queue;
-        
+
         return notificationServer;
     }
-    
+
     - (void) dealloc {
         if (notificationServer == self) {
             notificationServer = nil;
         }
-        
+
         %orig;
     }
-    
+
     // As the app does not request notification permission, this
     // would usually return nil for our app, but we make it return the
     // section info for Settings which makes the notification display
@@ -55,7 +55,7 @@ static NSObject<OS_dispatch_queue>* notificationServerQueue = nil;
         if ([sectionID isEqual: @"com.beeper.beepserv.app"]) {
             return [self _sectionInfoForSectionID: @"com.apple.Preferences" effective: effective];
         }
-        
+
         return %orig;
     }
 %end
@@ -66,9 +66,9 @@ static NSObject<OS_dispatch_queue>* notificationServerQueue = nil;
             LOG(@"Not sending notification because BBServer is not set");
             return;
         }
-        
+
         bool shouldUseOtherPublishMethod = false;
-        
+
         if (![notificationServer respondsToSelector: @selector(publishBulletin:destinations:)]) {
             if ([notificationServer respondsToSelector: @selector(publishBulletin:destinations:alwaysToLockScreen:)]) {
                 shouldUseOtherPublishMethod = true;
@@ -77,31 +77,31 @@ static NSObject<OS_dispatch_queue>* notificationServerQueue = nil;
                 return;
             }
         }
-        
+
         BBBulletin* bulletin = [[%c(BBBulletin) alloc] init];
-        
+
         bulletin.bulletinID = [[NSProcessInfo processInfo] globallyUniqueString];
         bulletin.recordID = [[NSProcessInfo processInfo] globallyUniqueString];
         bulletin.publisherBulletinID = [[NSProcessInfo processInfo] globallyUniqueString];
         bulletin.date = [NSDate date];
         bulletin.lastInterruptDate = [NSDate date];
         bulletin.turnsOnDisplay = false;
-        
+
         bulletin.title = @"beepserv";
         bulletin.message = message;
         bulletin.sectionID = @"com.beeper.beepserv.app";
-        
+
         // Open the beepserv app when the notification is tapped
         bulletin.defaultAction = [%c(BBAction) actionWithLaunchBundleID: @"com.beeper.beepserv.app" callblock: nil];
-        
+
         if ([bulletin respondsToSelector: @selector(setClearable:)]) {
             [bulletin setClearable: true];
         }
-        
+
         // LOG(@"Dispatching in notification server queue");
         dispatch_sync(notificationServerQueue, ^{
             // LOG(@"Publishing notification");
-            
+
             if (shouldUseOtherPublishMethod) {
                 [notificationServer publishBulletin: bulletin destinations: 14 alwaysToLockScreen: false];
             } else {
@@ -114,9 +114,9 @@ static NSObject<OS_dispatch_queue>* notificationServerQueue = nil;
 %hook SpringBoard
     - (void) applicationDidFinishLaunching:(id)arg1 {
         %orig;
-        
+
         LOG(@"SpringBoard launched");
-        
+
         // Wait a bit to make sure SpringBoard has fully initialized
         [NSTimer
             scheduledTimerWithTimeInterval: 5
@@ -131,10 +131,10 @@ static NSObject<OS_dispatch_queue>* notificationServerQueue = nil;
                 {
                     NSDictionary* userInfo = notification.userInfo;
                     NSString* messageText = userInfo[kMessageText];
-                    
+
                     [BPNotificationHelper sendNotificationWithMessage: messageText];
                 }];
-                
+
                 // Tell the Controller that SpringBoard was restarted so it can re-send
                 // the connection notification
                 [NSDistributedNotificationCenter.defaultCenter

@@ -2,6 +2,6 @@
 
 @interface IDSDAccountController: NSObject
     + (instancetype) sharedInstance;
-    
+
     - (NSArray<IDSDAccount*>*) accounts;
 @end

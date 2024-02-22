@@ -22,12 +22,12 @@ int main(int argc, char *argv[], char *envp[]) {
 				bp_log_impl_internal(kModuleNameIdentityServices, logString, false);
 			}];
 		}
-		
+
 		[BPSocketConnectionManager.sharedInstance startConnection];
-		
+
 		// Keeps the process running
 		[[NSRunLoop currentRunLoop] run];
-		
+
 		return 0;
 	}
 }
