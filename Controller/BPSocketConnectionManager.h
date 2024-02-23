@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
-#import "SRWebSocket.h"
+#import "../SocketRocket/SocketRocket/SRWebSocket.h"
 #import "../Shared/BPState.h"
 
 @interface BPSocketConnectionManager: NSObject <SRWebSocketDelegate>

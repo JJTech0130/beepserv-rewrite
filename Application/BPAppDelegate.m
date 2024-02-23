@@ -1,6 +1,7 @@
 #import "BPAppDelegate.h"
 #import "BPOverviewViewController.h"
 #import "BPLogsViewController.h"
+#import "../Shared/BPPrefs.h"
 
 @implementation BPAppDelegate
     - (BOOL) application:(UIApplication*)application didFinishLaunchingWithOptions:(NSDictionary*)launchOptions {

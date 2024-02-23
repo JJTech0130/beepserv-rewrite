@@ -21,7 +21,7 @@ intptr_t bp_nac_sign_func_offset = 0;
 
 NSString * __nonnull patched_ids_path() {
     NSString *dir_paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    return [NSString stringWithFormat:@"%@/patched_identityservicesd", dir_paths];
+    return [NSString stringWithFormat:@"%@/patched_identityservicesd.dylib", dir_paths];
 }
 
 NSString * __nonnull dylibify_ids_if_needed(NSError * __nullable * __nullable err) {

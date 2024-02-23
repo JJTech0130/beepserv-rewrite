@@ -14,11 +14,14 @@ NSData * __nullable validation_data_from_offsets(NSError * __nullable * __nullab
     if (dylibify_err)
         ERR(@"Couldn't dylibify identityservicesd: %@", dylibify_err);
 
+    if (![NSFileManager.defaultManager fileExistsAtPath:patched_path])
+        ERR(@"identityservicesd doesn't exist at %@", patched_path);
+
     if (!ids_handle) {
-        ids_handle = dlopen(patched_path.UTF8String, RTLD_NOW);
+        ids_handle = dlopen(patched_path.UTF8String, RTLD_NOW | RTLD_NODELETE);
 
         if (!ids_handle)
-            ERR(@"Couldn't dlopen patched identityservicesd");
+            ERR(@"Couldn't dlopen patched identityservicesd: %s", dlerror());
     }
 
     if (!bp_has_found_offsets) {

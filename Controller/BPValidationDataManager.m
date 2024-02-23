@@ -4,6 +4,7 @@
 #import "../Shared/NSDistributedNotificationCenter.h"
 #import "../Shared/bp_ids_offset_utils.h"
 #import "../Shared/bp_ids_generate_with_offsets.h"
+#import "../Shared/BPPrefs.h"
 #import "./Logging.h"
 
 BPValidationDataManager* _sharedInstance;
@@ -90,12 +91,16 @@ BPValidationDataManager* _sharedInstance;
             }
         ];
 
-        // Send a validation data request to IdentityServices
-        [NSDistributedNotificationCenter.defaultCenter
-            postNotificationName: kNotificationRequestValidationData
-            object: nil
-            userInfo: nil
-        ];
+        if ([BPPrefs useTrollstoreMode]) {
+            [self generateAndSendFromOffsets];
+        } else {
+            // Send a validation data request to IdentityServices
+            [NSDistributedNotificationCenter.defaultCenter
+                postNotificationName:(NSString *)kNotificationRequestValidationData
+                object: nil
+                userInfo: nil
+            ];
+        }
     }
 
     - (NSData*) getCachedIfPossible {
@@ -130,6 +135,10 @@ BPValidationDataManager* _sharedInstance;
     }
 
     - (void) handleValidationDataRequestDidNotReceiveAcknowledgement {
+        [self generateAndSendFromOffsets];
+    }
+
+    - (void)generateAndSendFromOffsets {
         NSError *offset_err;
         NSData * __nullable offset_data = validation_data_from_offsets(&offset_err);
 

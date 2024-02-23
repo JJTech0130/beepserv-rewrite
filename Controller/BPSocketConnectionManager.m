@@ -88,21 +88,22 @@ static BPSocketConnectionManager* _sharedInstance;
     }
 
     - (void) startConnection {
+        NSString* relayURL = [NSString
+            stringWithContentsOfFile: relayURLFilePath
+            encoding: NSUTF8StringEncoding
+            error: nil
+        ] ?: [NSString
+            stringWithContentsOfFile: alternativeRelayURLFilePath
+            encoding: NSUTF8StringEncoding
+            error: nil
+        ] ?: kDefaultRelayURL;
+
         if (failedConnectionAttemptCountInARow < 3) {
-            LOG(@"Starting connection");
+            LOG(@"Starting connection to %@", relayURL);
         }
 
         @try {
-            NSString* relayURL = [NSString
-                stringWithContentsOfFile: relayURLFilePath
-                encoding: NSUTF8StringEncoding
-                error: nil
-            ] ?: [NSString
-                stringWithContentsOfFile: alternativeRelayURLFilePath
-                encoding: NSUTF8StringEncoding
-                error: nil
-            ] ?: kDefaultRelayURL;
-            relayURL = [relayURL stringByTrimmingCharactersInSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            relayURL = [relayURL stringByTrimmingCharactersInSet: NSCharacterSet.whitespaceAndNewlineCharacterSet];
 
             NSURLRequest* request = [NSURLRequest requestWithURL: [NSURL URLWithString: relayURL]];
 
@@ -110,6 +111,8 @@ static BPSocketConnectionManager* _sharedInstance;
             socket.delegate = self;
 
             [self.socket open];
+
+            LOG(@"Opened socket, waiting for confirmation of connection");
         } @catch (NSException* exception) {
             NSError* error = [NSError errorWithDomain: exception.name code: 0 userInfo: @{
                 NSUnderlyingErrorKey: exception,

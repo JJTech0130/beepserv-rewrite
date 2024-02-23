@@ -45,7 +45,9 @@ static const NSString* kNotificationRequestNewRegistrationCode = @"com.beeper.be
 static const NSString* kNotificationSendNotificationBulletin = @"com.beeper.beepserv/sendNotificationBulletin";
 static const NSString* kNotificationSpringBoardRestarted = @"com.beeper.beepserv/springBoardRestarted";
 static const NSString* kNotificationLogEntryFromIdentityServices = @"com.beeper.beepserv/logEntryFromIdentityServices";
+static const NSString* kNotificationKillDaemon = @"com.beeper.beepserv/killDaemon";
 
 static const NSString* kPrefsFilePath = ROOT_PATH_NS(@"/var/mobile/.beepserv_prefs");
 
 static const NSString* kPrefsKeyShouldShowNotifications = @"shouldShowNotifications";
+static const NSString* kPrefsKeyUseTrollstoreMode = @"useTrollstoreMode";

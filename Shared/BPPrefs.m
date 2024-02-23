@@ -8,8 +8,12 @@
 void bp_log_impl(NSString* moduleName, NSString* logString);
 
 @implementation BPPrefs
-    + (BOOL) shouldShowNotifications {
-        NSURL* url = [NSURL URLWithString: [NSString stringWithFormat: @"file://%@", kPrefsFilePath]];
+    + (NSURL * __nonnull)prefsUrl {
+        return [NSURL URLWithString: [NSString stringWithFormat: @"file://%@", kPrefsFilePath]];
+    }
+
+    + (NSDictionary * __nonnull)getCurrentPrefs {
+        NSURL* url = [self prefsUrl];
 
         NSDictionary* prefsDict;
 
@@ -19,17 +23,19 @@ void bp_log_impl(NSString* moduleName, NSString* logString);
             prefsDict = [NSDictionary dictionaryWithContentsOfURL: url];
         }
 
-        return (prefsDict && prefsDict[kPrefsKeyShouldShowNotifications])
-            ? [(NSNumber*) prefsDict[kPrefsKeyShouldShowNotifications] boolValue]
-            : true;
+        return prefsDict ?: NSDictionary.new;
     }
 
-    + (void) setShouldShowNotifications:(BOOL)shouldShowNotificationsFromNowOn {
-        NSError* writingError;
-        NSURL* url = [NSURL URLWithString: [NSString stringWithFormat: @"file://%@", kPrefsFilePath]];
-        NSDictionary* prefsDict = @{
-            kPrefsKeyShouldShowNotifications: [NSNumber numberWithBool: shouldShowNotificationsFromNowOn]
-        };
+    + (NSNumber * __nullable) getBoolForKey:(const NSString * __nonnull)key {
+        return [self getCurrentPrefs][key];
+    }
+
+    + (void) setBool:(BOOL)value forKey:(const NSString * __nonnull)key {
+        NSMutableDictionary *prefsDict = [self getCurrentPrefs].mutableCopy;
+        prefsDict[key] = [NSNumber numberWithBool:value];
+
+        NSError *writingError;
+        NSURL *url = [self prefsUrl];
 
         if (@available(iOS 11, *)) {
             [prefsDict writeToURL: url error: &writingError];
@@ -44,5 +50,23 @@ void bp_log_impl(NSString* moduleName, NSString* logString);
         if (writingError) {
             LOG(@"Writing whether notifications should be shown to disk failed with error: %@", writingError);
         }
+    }
+
+    + (BOOL)shouldShowNotifications {
+        NSNumber * __nullable value = [self getBoolForKey:kPrefsKeyShouldShowNotifications];
+        return value ? value.boolValue : true;
+    }
+
+    + (void)setShouldShowNotifications:(BOOL)shouldShowNotificationsFromNowOn {
+        [self setBool:shouldShowNotificationsFromNowOn forKey:kPrefsKeyShouldShowNotifications];
+    }
+
+    + (BOOL)useTrollstoreMode {
+        NSNumber * __nullable value = [self getBoolForKey:kPrefsKeyUseTrollstoreMode];
+        return value ? value.boolValue : false;
+    }
+
+    + (void)setUseTrollstoreMode:(BOOL)useTrollstoreMode {
+        [self setBool:useTrollstoreMode forKey:kPrefsKeyUseTrollstoreMode];
     }
 @end

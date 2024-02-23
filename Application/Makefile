@@ -17,10 +17,14 @@ include $(THEOS)/makefiles/common.mk
 
 APPLICATION_NAME = BeepservApplication
 
-$(APPLICATION_NAME)_FILES = $(wildcard *.m) ../Shared/BPState.m ../Shared/Logging.m ../Shared/BPPrefs.m ../Shared/bp_ids_generate_with_offsets.m ../Shared/bp_ids_offset_utils.m ../Shared/dylibify/obj-c/dylibify.m
+LINK_DIRS := $(shell sh -c "find ../SocketRocket/SocketRocket -type d | xargs -I % echo -I%")
+M_FILES := $(shell find ../SocketRocket/SocketRocket -type f -name '*.m')
+
+$(APPLICATION_NAME)_FILES = $(wildcard *.m) ../Shared/BPState.m ../Shared/Logging.m ../Shared/BPPrefs.m ../Shared/bp_ids_generate_with_offsets.m ../Shared/bp_ids_offset_utils.m ../Shared/dylibify/obj-c/dylibify.m ../Controller/BPSocketConnectionManager.m ../Controller/BPDeviceIdentifiers.m ../Controller/BPNotificationSender.m $(M_FILES) ../Controller/BPValidationDataManager.m ../Shared/BPTimer.m ../Controller/BPSocketConnectionManager+SRWebSocketDelegate.m
 $(APPLICATION_NAME)_FRAMEWORKS = UIKit CoreGraphics
-$(APPLICATION_NAME)_CFLAGS = -fobjc-arc
+$(APPLICATION_NAME)_CFLAGS = -fobjc-arc -I../SocketRocket -Wno-deprecated $(LINK_DIRS)
 $(APPLICATION_NAME)_CODESIGN_FLAGS = -S./entitlements.plist
+$(APPLICATION_NAME)_LIBRARIES = MobileGestalt
 
 include $(THEOS_MAKE_PATH)/application.mk
 

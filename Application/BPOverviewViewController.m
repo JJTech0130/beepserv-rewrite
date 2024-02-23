@@ -4,6 +4,7 @@
 #import "../Shared/Constants.h"
 #import "../Shared/NSDistributedNotificationCenter.h"
 #import "../Shared/bp_ids_generate_with_offsets.h"
+#import "../Controller/BPSocketConnectionManager.h"
 #import <UIKit/UIKit.h>
 
 @interface BPOverviewViewController ()
@@ -19,9 +20,17 @@
     // Only shown before we receive a state update from the Controller
     @property (retain) UIActivityIndicatorView* activityIndicatorView;
 
-    @property (retain) UIView* notificationPrefsContainer;
+    @property (retain) UIView* prefsContainer;
     @property (retain) UILabel* notificationsSwitchLabel;
     @property (retain) UISwitch* notificationsSwitch;
+
+    @property (retain) UILabel* trollstoreModeLabel;
+    @property (retain) UISwitch* trollstoreModeSwitch;
+
+    // Used just to retain the BPSocketConnectionManager when we're using trollstoremode
+    // we'll still be communicating to it over NSDistributedNotificationCenter, since that's
+    // most compatible between different versions (daemon vs trollstore)
+    @property (retain, nullable) id connectionManager;
 @end
 
 @implementation BPOverviewViewController
@@ -31,9 +40,11 @@
     @synthesize belowCodeLabel;
     @synthesize noConnectionLabel;
     @synthesize activityIndicatorView;
-    @synthesize notificationPrefsContainer;
+    @synthesize prefsContainer;
     @synthesize notificationsSwitchLabel;
     @synthesize notificationsSwitch;
+    @synthesize trollstoreModeLabel;
+    @synthesize trollstoreModeSwitch;
 
     - (void) viewDidLoad {
         [super viewDidLoad];
@@ -48,6 +59,12 @@
         [self addViews];
         [self addStateUpdateListener];
         [self requestStateUpdate];
+
+        // Only start this up after we've started listening to updates from it
+        if ([BPPrefs useTrollstoreMode]) {
+            self.connectionManager = BPSocketConnectionManager.sharedInstance;
+            [self.connectionManager startConnection];
+        }
     }
 
     - (void) addNavigationBarButtonItems {
@@ -99,7 +116,7 @@
         codeLabel.numberOfLines = 10;
         codeLabel.translatesAutoresizingMaskIntoConstraints = false;
         codeLabel.textAlignment = NSTextAlignmentCenter;
-        codeLabel.font = [UIFont boldSystemFontOfSize:8];
+        codeLabel.font = [UIFont boldSystemFontOfSize:38];
         codeLabel.text = @"AAAA\nBBBB\nCCCC\nDDDD";
 
         [connectionDetailsContainer addSubview: codeLabel];
@@ -165,40 +182,67 @@
     }
 
     - (void) addNotificationPrefsContainer {
-        notificationPrefsContainer = [[UIView alloc] init];
-        notificationPrefsContainer.translatesAutoresizingMaskIntoConstraints = false;
+        prefsContainer = [[UIView alloc] init];
+        prefsContainer.translatesAutoresizingMaskIntoConstraints = false;
 
-        [self.view addSubview: notificationPrefsContainer];
+        [self.view addSubview: prefsContainer];
 
         if (@available(iOS 11, *)) {
-            [notificationPrefsContainer.bottomAnchor constraintEqualToAnchor: self.view.safeAreaLayoutGuide.bottomAnchor constant: -32].active = true;
-            [notificationPrefsContainer.centerXAnchor constraintEqualToAnchor: self.view.safeAreaLayoutGuide.centerXAnchor].active = true;
+            [prefsContainer.bottomAnchor constraintEqualToAnchor: self.view.safeAreaLayoutGuide.bottomAnchor constant: -32].active = true;
+            [prefsContainer.centerXAnchor constraintEqualToAnchor: self.view.safeAreaLayoutGuide.centerXAnchor].active = true;
         } else {
-            [notificationPrefsContainer.bottomAnchor constraintEqualToAnchor: self.view.bottomAnchor constant: -32].active = true;
-            [notificationPrefsContainer.centerXAnchor constraintEqualToAnchor: self.view.centerXAnchor].active = true;
+            [prefsContainer.bottomAnchor constraintEqualToAnchor: self.view.bottomAnchor constant: -32].active = true;
+            [prefsContainer.centerXAnchor constraintEqualToAnchor: self.view.centerXAnchor].active = true;
         }
 
-        notificationsSwitchLabel = [[UILabel alloc] init];
-        notificationsSwitchLabel.translatesAutoresizingMaskIntoConstraints = false;
-        notificationsSwitchLabel.textAlignment = NSTextAlignmentCenter;
-        notificationsSwitchLabel.font = [UIFont systemFontOfSize: 17];
-        notificationsSwitchLabel.text = @"Local state notifications";
+        UILabel * __nonnull(^labelWithString)(NSString * __nonnull) = ^UILabel * __nonnull(NSString * __nonnull labelString){
+            UILabel *label = UILabel.new;
+            label.translatesAutoresizingMaskIntoConstraints = false;
+            label.textAlignment = NSTextAlignmentCenter;
+            label.font = [UIFont systemFontOfSize: 17];
+            label.text = labelString;
+            return label;
+        };
 
-        [notificationPrefsContainer addSubview: notificationsSwitchLabel];
+        // MARK: Add trollstore stuff
+        // label first
+        trollstoreModeLabel = labelWithString(@"Trollstore Mode");
 
-        [notificationsSwitchLabel.leftAnchor constraintEqualToAnchor: notificationPrefsContainer.leftAnchor].active = true;
-        [notificationsSwitchLabel.topAnchor constraintEqualToAnchor: notificationPrefsContainer.topAnchor].active = true;
-        [notificationsSwitchLabel.bottomAnchor constraintEqualToAnchor: notificationPrefsContainer.bottomAnchor].active = true;
+        [prefsContainer addSubview:trollstoreModeLabel];
 
+        [trollstoreModeLabel.leftAnchor constraintEqualToAnchor:prefsContainer.leftAnchor].active = true;
+        [trollstoreModeLabel.bottomAnchor constraintEqualToAnchor:prefsContainer.bottomAnchor].active = true;
+
+        // then add switch
+        trollstoreModeSwitch = UISwitch.new;
+        trollstoreModeSwitch.translatesAutoresizingMaskIntoConstraints = false;
+        [prefsContainer addSubview:trollstoreModeSwitch];
+
+        [trollstoreModeSwitch.leftAnchor constraintEqualToAnchor:trollstoreModeLabel.rightAnchor constant:16].active = true;
+        // [trollstoreModeSwitch.rightAnchor constraintEqualToAnchor:prefsContainer.rightAnchor].active = true;
+        [trollstoreModeSwitch.bottomAnchor constraintEqualToAnchor:prefsContainer.bottomAnchor].active = true;
+
+        trollstoreModeSwitch.on = [BPPrefs useTrollstoreMode];
+        [trollstoreModeSwitch addTarget:self action:@selector(handleTrollstoreModeSwitchToggled) forControlEvents:UIControlEventValueChanged];
+
+        // MARK: Notifications stuff
+        // label first
+        notificationsSwitchLabel = labelWithString(@"Local state notifications");
+
+        [prefsContainer addSubview: notificationsSwitchLabel];
+
+        [notificationsSwitchLabel.leftAnchor constraintEqualToAnchor: prefsContainer.leftAnchor].active = true;
+        [notificationsSwitchLabel.bottomAnchor constraintEqualToAnchor: trollstoreModeLabel.topAnchor constant:-16].active = true;
+        [notificationsSwitchLabel.topAnchor constraintEqualToAnchor:prefsContainer.topAnchor].active = true;
+
+        // then add switch
         notificationsSwitch = [[UISwitch alloc] init];
         notificationsSwitch.translatesAutoresizingMaskIntoConstraints = false;
-
-        [notificationPrefsContainer addSubview: notificationsSwitch];
+        [prefsContainer addSubview: notificationsSwitch];
 
         [notificationsSwitch.leftAnchor constraintEqualToAnchor: notificationsSwitchLabel.rightAnchor constant: 16].active = true;
-        [notificationsSwitch.rightAnchor constraintEqualToAnchor: notificationPrefsContainer.rightAnchor].active = true;
-        [notificationsSwitch.topAnchor constraintEqualToAnchor: notificationPrefsContainer.topAnchor].active = true;
-        [notificationsSwitch.bottomAnchor constraintEqualToAnchor: notificationPrefsContainer.bottomAnchor].active = true;
+        [notificationsSwitch.rightAnchor constraintEqualToAnchor: prefsContainer.rightAnchor].active = true;
+        [notificationsSwitch.bottomAnchor constraintEqualToAnchor: trollstoreModeSwitch.topAnchor].active = true;
 
         notificationsSwitch.on = [BPPrefs shouldShowNotifications];
 
@@ -207,6 +251,23 @@
 
     - (void) handleNotificationsSwitchToggled {
         [BPPrefs setShouldShowNotifications: notificationsSwitch.on];
+    }
+
+    - (void) handleTrollstoreModeSwitchToggled {
+        BOOL toggledOn = trollstoreModeSwitch.on;
+        [BPPrefs setUseTrollstoreMode:toggledOn];
+
+        // Kill the daemon since we don't need it anymore
+        if (toggledOn) {
+            [NSDistributedNotificationCenter.defaultCenter
+                postNotificationName:kNotificationKillDaemon
+                object:nil
+                userInfo:nil
+            ];
+        }
+
+        // Just exit to force it to reload and reconnect
+        exit(0);
     }
 
     - (void) addStateUpdateListener {
@@ -249,18 +310,11 @@
     }
 
     - (void) handleNewRegistrationCodeRequestButtonPressed {
-        [activityIndicatorView stopAnimating];
-        noConnectionLabel.hidden = true;
-        connectionDetailsContainer.hidden = false;
-
-        // we just open this each time 'cause why not
-
-        NSError *gen_err;
-        NSData *data = validation_data_from_offsets(&gen_err);
-
-        if (gen_err)
-            codeLabel.text = [NSString stringWithFormat:@"Couldn't generate validation data: %@", gen_err];
-        else
-            codeLabel.text = [data base64EncodedStringWithOptions:0];
+        // Request a new registration code from the Controller
+        [[NSDistributedNotificationCenter defaultCenter]
+            postNotificationName: kNotificationRequestNewRegistrationCode
+            object: nil
+            userInfo: nil
+        ];
     }
 @end

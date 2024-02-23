@@ -6,6 +6,7 @@
 
 @implementation BPSocketConnectionManager (SRWebSocketDelegate)
     - (void) webSocketDidOpen:(SRWebSocket*)webSocket {
+        LOG(@"Socket opened, sending begin message");
         [self sendBeginMessage];
     }
 
