@@ -4,3 +4,6 @@
 [submodule "Shared/dylibify"]
 	path = Shared/dylibify
 	url = https://github.com/itsjunetime/dylibify.git
+[submodule "Shared/TrollStore"]
+	path = Shared/TrollStore
+	url = https://github.com/opa334/TrollStore.git

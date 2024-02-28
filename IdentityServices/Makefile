@@ -6,7 +6,7 @@ else
 	TARGET_OS_DEPLOYMENT_VERSION = 10.0
 	OLDER_XCODE_PATH=/Applications/Xcode_11.7.app
 	PREFIX=$(OLDER_XCODE_PATH)/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/
-	SYSROOT=$(OLDER_XCODE_PATH)/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk
+	SYSROOT=$(THEOS)/sdks/iPhoneOS13.7.sdk
 	SDKVERSION = 13.7
 	INCLUDE_SDKVERSION = 13.7
 endif
@@ -17,8 +17,10 @@ INSTALL_TARGET_PROCESSES = identityservicesd
 
 TWEAK_NAME = BeepservIdentityServices
 
-$(TWEAK_NAME)_FILES = $(wildcard *.x) ../Shared/BPTimer.m ../Shared/Logging.m ../Shared/bp_ids_offset_utils.m ../Shared/dylibify/obj-c/dylibify.m
+$(TWEAK_NAME)_FILES = $(wildcard *.x) ../Shared/BPTimer.m ../Shared/Logging.m ../Shared/bp_ids_offset_utils.m ../Shared/dylibify/obj-c/dylibify.m ../Shared/TrollStore/Shared/TSUtil.m
 $(TWEAK_NAME)_CFLAGS = -fobjc-arc
 $(TWEAK_NAME)_LIBRARIES = MobileGestalt
+$(TWEAK_NAME)_FRAMEWORKS = CoreServices CoreTelephony
+$(TWEAK_NAME)_PRIVATE_FRAMEWORKS = MobileContainerManager
 
 include $(THEOS_MAKE_PATH)/tweak.mk

@@ -1,4 +1,5 @@
 #include "./dylibify/obj-c/dylibify.h"
+#import "./TrollStore/Shared/TSUtil.h"
 #import <substrate.h>
 #import "bp_ids_offset_utils.h"
 // I guess we can still log this as if it's in identityservicesd
@@ -24,15 +25,73 @@ NSString * __nonnull patched_ids_path() {
     return [NSString stringWithFormat:@"%@/patched_identityservicesd.dylib", dir_paths];
 }
 
+void dylibify_and_sign(
+    NSString * __nonnull identityservicesd_path,
+    NSString * __nonnull patched_path,
+    NSError * __nullable * __nullable error
+) {
+    dylibify(identityservicesd_path, patched_path, error);
+    if (error && *error)
+        return;
+
+    NSString * __nullable trollstorePath = trollStoreAppPath();
+    if (!trollstorePath)
+        RET_ERR(error, , @"TrollStore not installed (need to use ldid from TrollStore for signing)");
+
+    NSBundle *mainBundle = NSBundle.mainBundle;
+    if (!mainBundle)
+        RET_ERR(error, , @"mainBundle returned nil for the current app");
+
+    NSString *entitlementsPath = [mainBundle pathForResource:@"entitlements" ofType:@"plist"];
+    if (!entitlementsPath)
+        RET_ERR(error, , @"entitlements.plist could not be found in the current bundle for signing ldid");
+
+    NSString *signFlag = [NSString stringWithFormat:@"-S%@", entitlementsPath];
+
+    NSString *ldidPath = [trollstorePath stringByAppendingPathComponent:@"ldid"];
+
+    if (![NSFileManager.defaultManager fileExistsAtPath:ldidPath])
+        RET_ERR(error, , @"ldid doesn't exist at %@", ldidPath);
+
+    LOG(@"Running %@ %@ %@", ldidPath, signFlag, patched_path);
+
+    NSString *ldidErr;
+    NSString *ldidOut;
+    int ldidCode = spawnRoot(ldidPath, @[signFlag, patched_path], &ldidOut, &ldidErr);
+
+    if (ldidCode)
+        RET_ERR(error, , @"Couldn't sign identityservicesd with ldid: %d, %@, %@", ldidCode, ldidErr, ldidOut);
+
+    NSString *entitlements;
+    int entCheckCode = spawnRoot(ldidPath, @[@"-e", patched_path], &entitlements, nil);
+
+    LOG(@"Code: %d, Dumped entitlements: %@", entCheckCode, entitlements);
+}
+
+NSString * __nonnull force_dylibify_ids(NSError * __nullable * __nullable err) {
+    NSString *patched_path = patched_ids_path();
+
+    if ([NSFileManager.defaultManager fileExistsAtPath:patched_path]) {
+        [NSFileManager.defaultManager removeItemAtPath:patched_path error:err];
+
+        if (err && *err)
+            return patched_path;
+    }
+
+    dylibify_and_sign(identityservicesd_path, patched_path, err);
+    return patched_path;
+}
+
 NSString * __nonnull dylibify_ids_if_needed(NSError * __nullable * __nullable err) {
     NSString *patched_path = patched_ids_path();
 
     if ([NSFileManager.defaultManager fileExistsAtPath:patched_path])
         return patched_path;
 
-    dylibify(identityservicesd_path, patched_path, err);
+    dylibify_and_sign(identityservicesd_path, patched_path, err);
     return patched_path;
 }
+
 
 unsigned long bp_get_image_file_size(NSError * __nullable * __nullable error, NSString * __nonnull path) {
     #define ERR(...) RET_ERR(error, 0, __VA_ARGS__)
@@ -105,10 +164,9 @@ intptr_t bp_find_pattern_offset(
     int target_match_index,
     intptr_t start_offset,
     intptr_t max_offset_from_start_offset,
+    intptr_t ref_addr,
     unsigned long image_size
 ) {
-    intptr_t ref_addr = bp_get_ref_addr();
-
     intptr_t current_start_addr = ref_addr;
 
     if (start_offset) {
@@ -159,7 +217,7 @@ intptr_t bp_find_pattern_offset(
     return 0;
 }
 
-intptr_t bp_find_nac_init_call_log_string(unsigned long image_size) {
+intptr_t bp_find_nac_init_call_log_string(intptr_t ref_addr, unsigned long image_size) {
     NSString *nac_init_call_log_string_content = @"Calling NACInit with";
 
     intptr_t niclsc_offset = bp_find_pattern_offset(
@@ -168,6 +226,7 @@ intptr_t bp_find_nac_init_call_log_string(unsigned long image_size) {
         0,
         0,
         0,
+        ref_addr,
         image_size
     );
 
@@ -177,6 +236,7 @@ intptr_t bp_find_nac_init_call_log_string(unsigned long image_size) {
 // Returns the offset to the 'add' instruction, see explanation below
 intptr_t bp_find_nac_init_call_log_string_caller(
     intptr_t niclsc_offset, /* e.g. 0xa471bb */
+    intptr_t ref_addr,
     unsigned long image_size
 ) {
     // The nac init log string is loaded by
@@ -206,6 +266,7 @@ intptr_t bp_find_nac_init_call_log_string_caller(
             0,
             prev_potential_caller_offset + 1,
             0,
+            ref_addr,
             image_size
         );
 
@@ -217,7 +278,7 @@ intptr_t bp_find_nac_init_call_log_string_caller(
 
         intptr_t previous_instruction_offset = potential_caller_offset - 4;
 
-        intptr_t previous_instruction_addr = bp_get_ref_addr() + previous_instruction_offset;
+        intptr_t previous_instruction_addr = ref_addr + previous_instruction_offset;
 
         unsigned char previous_instruction_a = *((char*) previous_instruction_addr);
         unsigned char previous_instruction_b = *((char*) previous_instruction_addr + 1);
@@ -246,6 +307,7 @@ intptr_t bp_find_nac_init_call_log_string_caller(
 
 intptr_t bp_find_nac_init_call(
     intptr_t niclsc_caller_offset,
+    intptr_t ref_addr,
     unsigned long image_size
 ) {
     // Look for the next 'e4 ?? ?? 91' after the
@@ -264,6 +326,7 @@ intptr_t bp_find_nac_init_call(
             0,
             prev_potential_call_pre_offset + 1,
             0,
+            ref_addr,
             image_size
         );
 
@@ -273,7 +336,7 @@ intptr_t bp_find_nac_init_call(
 
         prev_potential_call_pre_offset = potential_call_pre_offset;
 
-        intptr_t potential_call_pre_instruction_d_addr = bp_get_ref_addr() + potential_call_pre_offset + 3;
+        intptr_t potential_call_pre_instruction_d_addr = ref_addr + potential_call_pre_offset + 3;
 
         unsigned char potential_call_pre_instruction_d = *((char*) potential_call_pre_instruction_d_addr);
 
@@ -287,8 +350,11 @@ intptr_t bp_find_nac_init_call(
     return 0;
 }
 
-intptr_t bp_convert_nac_init_call_offset_to_nac_init_func_offset(intptr_t nac_init_call_offset) {
-    intptr_t nac_init_call_addr = bp_get_ref_addr() + nac_init_call_offset;
+intptr_t bp_convert_nac_init_call_offset_to_nac_init_func_offset(
+    intptr_t nac_init_call_offset,
+    intptr_t ref_addr
+) {
+    intptr_t nac_init_call_addr = ref_addr + nac_init_call_offset;
 
     unsigned char nac_init_call_instruction_a = *((char*) nac_init_call_addr);
     unsigned char nac_init_call_instruction_b = *((char*) nac_init_call_addr + 1);
@@ -307,6 +373,7 @@ intptr_t bp_convert_nac_init_call_offset_to_nac_init_func_offset(intptr_t nac_in
 // Returns 1 if nac_key_establishment and 2 if nac_sign
 int bp_check_if_func_is_nac_sign_or_nac_key_establishment(
     intptr_t func_offset,
+    intptr_t ref_addr,
     unsigned long image_size
 ) {
     int match_count = 0;
@@ -326,6 +393,7 @@ int bp_check_if_func_is_nac_sign_or_nac_key_establishment(
             i,
             func_offset,
             40 * 4, /* 40 instructions max */
+            ref_addr,
             image_size
         );
 
@@ -335,7 +403,7 @@ int bp_check_if_func_is_nac_sign_or_nac_key_establishment(
 
         intptr_t match_instruction_b_offset = match_offset - 2;
 
-        unsigned char match_instruction_b = *((char*) (bp_get_ref_addr() + match_instruction_b_offset));
+        unsigned char match_instruction_b = *((char*) (ref_addr + match_instruction_b_offset));
 
         if (match_instruction_b != 0x03) {
             continue;
@@ -353,40 +421,29 @@ int bp_check_if_func_is_nac_sign_or_nac_key_establishment(
     }
 }
 
-void bp_find_offsets(
+void bp_find_offsets_within_buffer(
     NSError * __nullable * __nullable error,
-    NSString * __nonnull identityservicesd_path
+    intptr_t ref_addr,
+    unsigned long image_size
 ) {
     #define ERR(...) RET_ERR(error, , __VA_ARGS__)
 
-    NSError *size_err;
-    int image_size = bp_get_image_file_size(&size_err, identityservicesd_path);
-    if (!image_size || size_err)
-        ERR(@"Couldn't get image file size: %@", size_err);
-
-    intptr_t ref_addr = bp_get_ref_addr();
-    if (!ref_addr)
-        ERR(@"Couldn't get ref_addr");
-
-    if (ref_addr == 0x100000000)
-        ERR(@"ref_addr == 0x100000000, not continuing");
-
-    intptr_t niclsc_offset = bp_find_nac_init_call_log_string(image_size);
+    intptr_t niclsc_offset = bp_find_nac_init_call_log_string(ref_addr, image_size);
 
     if (!niclsc_offset)
         ERR(@"Couldn't get nac_init_call_log_string");
 
-    intptr_t niclsc_caller_offset = bp_find_nac_init_call_log_string_caller(niclsc_offset, image_size);
+    intptr_t niclsc_caller_offset = bp_find_nac_init_call_log_string_caller(niclsc_offset, ref_addr, image_size);
 
     if (!niclsc_caller_offset)
         ERR(@"Couldn't get caller before nac init log string");
 
-    intptr_t nac_init_call_offset = bp_find_nac_init_call(niclsc_caller_offset, image_size);
+    intptr_t nac_init_call_offset = bp_find_nac_init_call(niclsc_caller_offset, ref_addr, image_size);
 
     if (!nac_init_call_offset)
         ERR(@"Couldn't find call offset for nac_init_call");
 
-    bp_nac_init_func_offset = bp_convert_nac_init_call_offset_to_nac_init_func_offset(nac_init_call_offset);
+    bp_nac_init_func_offset = bp_convert_nac_init_call_offset_to_nac_init_func_offset(nac_init_call_offset, ref_addr);
 
     LOG(@"nac_init offset: %p", ((void*) bp_nac_init_func_offset));
 
@@ -394,7 +451,7 @@ void bp_find_offsets(
         ERR(@"nac_init_func_offset is negative (%lu)", bp_nac_init_func_offset);
 
     if (bp_nac_init_func_offset >= image_size)
-        ERR(@"nac_init_func_offset (%lx) is outside the bounds of the file size (%x)", bp_nac_init_func_offset, image_size);
+        ERR(@"nac_init_func_offset (%lx) is outside the bounds of the file size (%lx)", bp_nac_init_func_offset, image_size);
 
     intptr_t nac_init_func_approx_offset = bp_nac_init_func_offset & 0xFFFF00;
 
@@ -416,6 +473,7 @@ void bp_find_offsets(
             i,
             nac_init_func_offset_from_page,
             0,
+            ref_addr,
             image_size
         ) - 3;
 
@@ -445,6 +503,7 @@ void bp_find_offsets(
             0,
             match_offset,
             30 * 4, /* 30 instructions max */
+            ref_addr,
             image_size
         );
 
@@ -452,7 +511,7 @@ void bp_find_offsets(
             continue;
         }
 
-        int check_result = bp_check_if_func_is_nac_sign_or_nac_key_establishment(match_offset, image_size);
+        int check_result = bp_check_if_func_is_nac_sign_or_nac_key_establishment(match_offset, ref_addr, image_size);
 
         if (check_result == 1) {
             if (!bp_nac_key_establishment_func_offset) {
@@ -476,5 +535,26 @@ void bp_find_offsets(
         }
     }
 
-    ERR(@"Iterations yielded no valid candidates for fns")
+    ERR(@"Iterations yielded no valid candidates for fns");
+}
+
+void bp_find_offsets(
+    NSError * __nullable * __nullable error,
+    NSString * __nonnull identityservicesd_path
+) {
+    #define ERR(...) RET_ERR(error, , __VA_ARGS__)
+
+    NSError *size_err;
+    unsigned long image_size = bp_get_image_file_size(&size_err, identityservicesd_path);
+    if (!image_size || size_err)
+        ERR(@"Couldn't get image file size: %@", size_err);
+
+    intptr_t ref_addr = bp_get_ref_addr();
+    if (!ref_addr)
+        ERR(@"Couldn't get ref_addr");
+
+    if (ref_addr == 0x100000000)
+        ERR(@"ref_addr == 0x100000000, not continuing");
+
+    bp_find_offsets_within_buffer(error, ref_addr, image_size);
 }
