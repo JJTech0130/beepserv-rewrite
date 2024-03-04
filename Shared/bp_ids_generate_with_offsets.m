@@ -17,7 +17,7 @@ NSData * __nullable validation_data_from_offsets(NSError * __nullable * __nullab
     #define ERR(...) RET_ERR(error, nil, __VA_ARGS__)
 
     NSError *dylibify_err;
-    NSString *patched_path = force_dylibify_ids(&dylibify_err);
+    NSString *patched_path = dylibify_ids_if_needed(&dylibify_err);
 
     if (dylibify_err)
         ERR(@"Couldn't dylibify identityservicesd: %@", dylibify_err);
