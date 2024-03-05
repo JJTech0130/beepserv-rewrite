@@ -22,7 +22,8 @@ NSData * __nullable validation_data_from_offsets(NSError * __nullable * __nullab
     if (dylibify_err)
         ERR(@"Couldn't dylibify identityservicesd: %@", dylibify_err);
 
-    // if we haven't pulled it into memory yet, just dylibify it again. to be safe
+    // `dlopen` can run into issues sometimes, so here's code to mmap it into memory
+    // instead if necessary
     /*if (identityservicesd_start == MAP_FAILED || !identityservicesd_len) {
 
         NSError *size_err;
@@ -135,8 +136,8 @@ NSData * __nullable validation_data_from_offsets(NSError * __nullable * __nullab
         if (req_error) {
             outerReqError = [NSError errorWithDomain:@"beepserv" code:1 userInfo:@{@"Error Reason": [NSString stringWithFormat:@"initializeValidation request failed: %@", req_error]}];
         } else {
-            NSPropertyListFormat format;
-            NSDictionary* plist = [NSPropertyListSerialization propertyListWithData:plistData options:NSPropertyListImmutable format:&format error:&outerReqError];
+            NSDictionary* plist = [NSPropertyListSerialization propertyListWithData:plistData options:0 format:NULL error:&outerReqError];
+            LOG(@"Whole dict is %@", plist);
             sessionInfo = plist[@"session-info"];
         }
 
@@ -157,14 +158,14 @@ NSData * __nullable validation_data_from_offsets(NSError * __nullable * __nullab
 
     LOG(@"Got sessionInfo %@", sessionInfo);
 
-    int key_establishment_resp = nac_key_establishment(&validation_ctx, sessionInfo.bytes, sessionInfo.length);
+    int key_establishment_resp = nac_key_establishment(validation_ctx, sessionInfo.bytes, sessionInfo.length);
 
     if (key_establishment_resp != 0)
         ERR(@"nac_key_establishment returned error code %d", key_establishment_resp);
 
     void *sign_output_bytes;
     int sign_output_len;
-    int nac_sign_resp = nac_sign(&validation_ctx, nil, 0, &sign_output_bytes, &sign_output_len);
+    int nac_sign_resp = nac_sign(validation_ctx, nil, 0, &sign_output_bytes, &sign_output_len);
 
     if (nac_sign_resp != 0)
         ERR(@"nac_sign returned error code %d", nac_sign_resp);
