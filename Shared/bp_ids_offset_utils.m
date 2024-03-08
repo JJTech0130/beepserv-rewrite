@@ -1,5 +1,6 @@
 #include "./dylibify/obj-c/dylibify.h"
 #import "./TrollStore/Shared/TSUtil.h"
+#import "./TrollStore/Exploits/fastPathSign/src/coretrust_bug.h"
 #import <substrate.h>
 #import "bp_ids_offset_utils.h"
 // I guess we can still log this as if it's in identityservicesd
@@ -81,6 +82,10 @@ void dylibify_and_sign(
     dylibify(identityservicesd_path, patched_path, error);
     if (error && *error)
         return;
+
+    int coretrust_ret = apply_coretrust_bypass(patched_path.UTF8String);
+    if (coretrust_ret)
+        ERR(@"Couldn't apply coretrust bypass to %@: %d", patched_path, coretrust_ret);
 
     NSString * __nullable trollstorePath = trollStoreAppPath();
     if (!trollstorePath)
