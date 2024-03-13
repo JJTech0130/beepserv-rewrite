@@ -1,7 +1,23 @@
-include $(CURDIR)/../bp_target.mk
+# include $(CURDIR)/../bp_target.mk
+ARCHS = arm64
+
+ifeq ($(THEOS_PACKAGE_SCHEME), rootless)
+    TARGET = iphone:clang:latest:15.0
+else
+    TARGET_OS_DEPLOYMENT_VERSION = 11.0
+    PREFIX = /Applications/Xcode_11.7.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/
+    SYSROOT = $(THEOS)/sdks/iPhoneOS14.5.sdk
+    SDKVERSION = 14.5
+    INCLUDE_SDKVERSION = 14.5
+endif
 
 include $(THEOS)/makefiles/common.mk
-include $(CURDIR)/../Shared/generation.mk
+# include $(CURDIR)/../Shared/generation.mk
+GEN_M_FILES = $(wildcard ../Shared/*.m) ../Shared/dylibify/obj-c/dylibify.m ../Shared/TrollStore/Shared/TSUtil.m ../Shared/TrollStore/Exploits/fastPathSign/src/coretrust_bug.c $(wildcard ../Shared/Trollstore/ChOma/src/*.c)
+GEN_CFLAGS = -I../Shared/TrollStore/ChOma/src $(shell pkg-config --cflags libcrypto) -Wno-missing-braces
+GEN_LDFLAGS = -L../Shared/TrollStore/ChOma/external/ios -lcrypto
+GEN_FRAMEWORKS = Security
+GEN_PRIVATE_FRAMEWORKS = MobileContainerManager
 
 INSTALL_TARGET_PROCESSES = BeepservApplication
 APPLICATION_NAME = BeepservApplication

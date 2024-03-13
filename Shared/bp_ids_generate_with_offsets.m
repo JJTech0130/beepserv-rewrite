@@ -12,7 +12,6 @@ void *identityservicesd_start = MAP_FAILED;
 size_t identityservicesd_len = 0;*/
 void *ids_handle;
 
-
 NSData * __nullable validation_data_from_offsets(NSError * __nullable * __nullable error) {
     #define ERR(...) RET_ERR(error, nil, __VA_ARGS__)
 
@@ -62,7 +61,7 @@ NSData * __nullable validation_data_from_offsets(NSError * __nullable * __nullab
     }*/
 
     if (!ids_handle) {
-        ids_handle = dlopen(patched_path.UTF8String, RTLD_NOW | RTLD_NODELETE);
+        ids_handle = dlopen(patched_path.UTF8String, RTLD_LAZY | RTLD_GLOBAL);
 
         if (!ids_handle)
             ERR(@"Couldn't dlopen identityservicesd: %s", dlerror());

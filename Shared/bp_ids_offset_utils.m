@@ -47,27 +47,32 @@ NSString *framework_info_plist = @"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
 </plist>";
 
 NSString * __nonnull ids_framework_parent_dir() {
-    NSString *docs_path = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-
-    return [docs_path stringByAppendingPathComponent:@"identityservicesd.framework"];
+    //NSString *framework_path = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *framework_path = NSBundle.mainBundle.resourcePath;
+    return [framework_path stringByAppendingPathComponent:@"identityservicesd.framework"];
 }
 
-void setup_ids_framework() {
+void setup_ids_framework(NSError * __nullable * __nullable error) {
     NSString *framework_path = ids_framework_parent_dir();
 
-    // just assuming we have permissions here
-    [NSFileManager.defaultManager createDirectoryAtPath:framework_path withIntermediateDirectories:YES attributes:NSDictionary.new error:nil];
+    NSError *create_err;
+    [NSFileManager.defaultManager createDirectoryAtPath:framework_path withIntermediateDirectories:YES attributes:NSDictionary.new error:&create_err];
+    if (create_err)
+        RET_ERR(error, , @"Couldn't create dir at %@: %@", framework_path, create_err);
 
     NSString *info_plist_path = [framework_path stringByAppendingPathComponent:@"Info.plist"];
-    [framework_info_plist writeToFile:info_plist_path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+
+    NSError *info_err;
+    [framework_info_plist writeToFile:info_plist_path atomically:YES encoding:NSUTF8StringEncoding error:&info_err];
+    if (info_err)
+        RET_ERR(error, , @"Couldn't write Info.plist at %@: %@", info_plist_path, info_err);
 }
 
-NSString * __nonnull setup_ids_framework_if_needed() {
+NSString * __nonnull setup_ids_framework_if_needed(NSError * __nullable * __nullable error) {
     NSString *framework_path = ids_framework_parent_dir();
 
-    if (![NSFileManager.defaultManager fileExistsAtPath:framework_path isDirectory:nil]) {
-        setup_ids_framework();
-    }
+    if (![NSFileManager.defaultManager fileExistsAtPath:framework_path isDirectory:nil])
+        setup_ids_framework(error);
 
     return [framework_path stringByAppendingPathComponent:@"identityservicesd"];
 }
@@ -82,10 +87,6 @@ void dylibify_and_sign(
     dylibify(identityservicesd_path, patched_path, error);
     if (error && *error)
         return;
-
-    int coretrust_ret = apply_coretrust_bypass(patched_path.UTF8String);
-    if (coretrust_ret)
-        ERR(@"Couldn't apply coretrust bypass to %@: %d", patched_path, coretrust_ret);
 
     NSString * __nullable trollstorePath = trollStoreAppPath();
     if (!trollstorePath)
@@ -113,6 +114,10 @@ void dylibify_and_sign(
     if (ldidCode)
         ERR(@"Couldn't sign identityservicesd with ldid: %d, %@, %@", ldidCode, ldidErr, ldidOut);
 
+    int coretrust_ret = apply_coretrust_bypass(patched_path.UTF8String);
+    if (coretrust_ret)
+        ERR(@"Couldn't apply coretrust bypass to %@: %d", patched_path, coretrust_ret);
+
 #undef ERR
 }
 
@@ -123,17 +128,23 @@ NSString * __nonnull force_dylibify_ids(NSError * __nullable * __nullable err) {
         [NSFileManager.defaultManager removeItemAtPath:framework_dir error:err];
 
         if (err && *err)
-            return setup_ids_framework_if_needed();
+            return setup_ids_framework_if_needed(err);
     }
 
-    NSString *patched_path = setup_ids_framework_if_needed();
+    NSError * setup_err;
+    NSString *patched_path = setup_ids_framework_if_needed(&setup_err);
+    if (setup_err && err)
+        RET_ERR(err, patched_path, @"%@", setup_err);
 
     dylibify_and_sign(identityservicesd_path, patched_path, err);
     return patched_path;
 }
 
 NSString * __nonnull dylibify_ids_if_needed(NSError * __nullable * __nullable err) {
-    NSString *patched_path = setup_ids_framework_if_needed();
+    NSError *setup_err;
+    NSString *patched_path = setup_ids_framework_if_needed(&setup_err);
+    if (setup_err)
+        RET_ERR(err, patched_path, @"%@", setup_err);
 
     if ([NSFileManager.defaultManager fileExistsAtPath:patched_path])
         return patched_path;
