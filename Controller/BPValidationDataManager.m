@@ -6,6 +6,7 @@
 #import "../Shared/bp_ids_generate_with_offsets.h"
 #import "../Shared/BPPrefs.h"
 #import "./Logging.h"
+#import "../Shared/TrollStore/Shared/TSUtil.h"
 
 BPValidationDataManager* _sharedInstance;
 
@@ -140,7 +141,40 @@ BPValidationDataManager* _sharedInstance;
 
     - (void)generateAndSendFromOffsets {
         NSError *offset_err;
-        NSData * __nullable offset_data = validation_data_from_offsets(&offset_err);
+        NSData *offset_data;
+
+        // get argv[0]
+        uint32_t alloc_size = MAXPATHLEN * 3;
+        char *exec_path_buf = malloc(alloc_size);
+        memset(exec_path_buf, 0, alloc_size);
+        int ret = _NSGetExecutablePath(exec_path_buf, &alloc_size);
+
+        if (ret) {
+            LOG(@"ret for exec is %d", ret);
+            offset_err = [NSError errorWithDomain:@"com.beeper.beepserv" code:1 userInfo:@{
+                @"Error Reason": [NSString stringWithFormat:@"_NSGetExecutablePath returned %d", ret]
+            }];
+        } else {
+            NSString *path = [NSString stringWithCString:exec_path_buf encoding:NSUTF8StringEncoding];
+            LOG(@"path for argv[0] is %@", path);
+
+            NSString *stdout;
+            NSString *stderr;
+            int ret_code = spawnRoot(path, @[@"get-validation-data"], &stdout, &stderr);
+
+            LOG(@"ret_code: %d, stdout: %@, stderr: %@", ret_code, stdout, stderr);
+
+            if (ret_code != 0 || [stderr length] > 0)
+                offset_err = [NSError errorWithDomain:@"com.beeper.beepserv" code:2 userInfo:@{
+                    @"Error Reason": stderr
+                }];
+            else
+                offset_data = [NSData.alloc initWithBase64EncodedString:stdout options:0];
+        }
+
+        free(exec_path_buf);
+
+        // NSData * __nullable offset_data = validation_data_from_offsets(&offset_err);
 
         [self handleResponseWithValidationData:offset_data validationDataExpiryTimestamp:[NSDate.date timeIntervalSince1970] + (10 * 60) error:offset_err];
     }

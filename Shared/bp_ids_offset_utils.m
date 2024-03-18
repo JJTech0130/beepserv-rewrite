@@ -47,8 +47,8 @@ NSString *framework_info_plist = @"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
 </plist>";
 
 NSString * __nonnull ids_framework_parent_dir() {
-    //NSString *framework_path = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    NSString *framework_path = NSBundle.mainBundle.resourcePath;
+    NSString *framework_path = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    // NSString *framework_path = NSBundle.mainBundle.resourcePath;
     return [framework_path stringByAppendingPathComponent:@"identityservicesd.framework"];
 }
 

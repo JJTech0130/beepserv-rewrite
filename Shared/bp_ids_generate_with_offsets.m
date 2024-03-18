@@ -3,13 +3,17 @@
 #include <Foundation/Foundation.h>
 #include <errno.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/mman.h>
+#include <unistd.h>
+#include <pthread.h>
 
 bool bp_has_found_offsets = false;
 
 /*FILE *ids_file;
 void *identityservicesd_start = MAP_FAILED;
 size_t identityservicesd_len = 0;*/
+
 void *ids_handle;
 
 NSData * __nullable validation_data_from_offsets(NSError * __nullable * __nullable error) {
@@ -23,7 +27,8 @@ NSData * __nullable validation_data_from_offsets(NSError * __nullable * __nullab
 
     // `dlopen` can run into issues sometimes, so here's code to mmap it into memory
     // instead if necessary
-    /*if (identityservicesd_start == MAP_FAILED || !identityservicesd_len) {
+    /*int fd;
+    if (identityservicesd_start == MAP_FAILED || !identityservicesd_len) {
 
         NSError *size_err;
         identityservicesd_len = bp_get_image_file_size(&size_err, patched_path);
@@ -39,21 +44,21 @@ NSData * __nullable validation_data_from_offsets(NSError * __nullable * __nullab
         if (!ids_file)
             ERR(@"Couldn't fopen identityservicesd: %d", errno);
 
-        int fd = fileno(ids_file);
+        fd = fileno(ids_file);
         if (!fd)
             ERR(@"Couldn't get fd for ids_file");
 
         identityservicesd_start = mmap(
             NULL,
             identityservicesd_len,
-            PROT_READ | PROT_EXEC,
+            PROT_READ,
             MAP_FILE | MAP_PRIVATE,
             fd,
             0
         );
 
         if (identityservicesd_start == MAP_FAILED)
-            ERR(@"Couldn't mmap identityservicesd: %d", errno);
+            ERR(@"Couldn't mmap identityservicesd read: %d, %s", errno, strerror(errno));
 
         // so we should be making sure to `fclose` and `munmap` the resources we create
         // during this little block but they should be alive for the lifetime of the program
@@ -77,7 +82,7 @@ NSData * __nullable validation_data_from_offsets(NSError * __nullable * __nullab
         intptr_t identityservicesd_start = bp_get_ref_addr();
 
         NSError *offset_err;
-        bp_find_offsets_within_buffer(&offset_err, identityservicesd_start, identityservicesd_len);
+        bp_find_offsets_within_buffer(&offset_err, (intptr_t)identityservicesd_start, identityservicesd_len);
 
         if (offset_err)
             ERR(@"Couldn't find offsets to use: %@", offset_err);
@@ -85,7 +90,11 @@ NSData * __nullable validation_data_from_offsets(NSError * __nullable * __nullab
         bp_has_found_offsets = true;
     }
 
+    /*if (mprotect(identityservicesd_start, identityservicesd_len, PROT_EXEC) != 0)
+        ERR(@"mprotect returned error code %d: %s", errno, strerror(errno));*/
+
     intptr_t ref_addr = bp_get_ref_addr();
+    // intptr_t ref_addr = (intptr_t)identityservicesd_start;
 
     nac_init_fn *nac_init = (nac_init_fn *)(bp_nac_init_func_offset + ref_addr);
     nac_key_establishment_fn *nac_key_establishment = (nac_key_establishment_fn *)(bp_nac_key_establishment_func_offset + ref_addr);
