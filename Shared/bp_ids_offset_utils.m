@@ -46,111 +46,98 @@ NSString *framework_info_plist = @"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
 </dict>\
 </plist>";
 
-NSString * __nonnull ids_framework_parent_dir() {
-    NSString *framework_path = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    // NSString *framework_path = NSBundle.mainBundle.resourcePath;
-    return [framework_path stringByAppendingPathComponent:@"identityservicesd.framework"];
+NSString * __nonnull patched_ids_docs_path() {
+    NSString *docs_path = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    return [docs_path stringByAppendingPathComponent:@"identityservicesd"];
 }
 
-void setup_ids_framework(NSError * __nullable * __nullable error) {
-    NSString *framework_path = ids_framework_parent_dir();
-
-    NSError *create_err;
-    [NSFileManager.defaultManager createDirectoryAtPath:framework_path withIntermediateDirectories:YES attributes:NSDictionary.new error:&create_err];
-    if (create_err)
-        RET_ERR(error, , @"Couldn't create dir at %@: %@", framework_path, create_err);
-
-    NSString *info_plist_path = [framework_path stringByAppendingPathComponent:@"Info.plist"];
-
-    NSError *info_err;
-    [framework_info_plist writeToFile:info_plist_path atomically:YES encoding:NSUTF8StringEncoding error:&info_err];
-    if (info_err)
-        RET_ERR(error, , @"Couldn't write Info.plist at %@: %@", info_plist_path, info_err);
-}
-
-NSString * __nonnull setup_ids_framework_if_needed(NSError * __nullable * __nullable error) {
-    NSString *framework_path = ids_framework_parent_dir();
-
-    if (![NSFileManager.defaultManager fileExistsAtPath:framework_path isDirectory:nil])
-        setup_ids_framework(error);
-
+NSString * __nonnull patched_ids_bundle_path() {
+    NSString *framework_path = NSBundle.mainBundle.resourcePath;
     return [framework_path stringByAppendingPathComponent:@"identityservicesd"];
 }
 
-void dylibify_and_sign(
+NSString * __nullable dylibify_and_sign(
     NSString * __nonnull identityservicesd_path,
     NSString * __nonnull patched_path,
     NSError * __nullable * __nullable error
 ) {
-#define ERR(...) RET_ERR(error, , __VA_ARGS__)
+#define ERR(...) RET_ERR(error, nil, __VA_ARGS__)
 
     dylibify(identityservicesd_path, patched_path, error);
     if (error && *error)
-        return;
+        return nil;
 
-    NSString * __nullable trollstorePath = trollStoreAppPath();
-    if (!trollstorePath)
+    if (![NSFileManager.defaultManager fileExistsAtPath:patched_path])
+        ERR(@"File wasn't successfully copied over to %@", patched_path);
+
+    NSString * __nullable trollstore_path = trollStoreAppPath();
+    if (!trollstore_path)
         ERR(@"TrollStore not installed (need to use ldid from TrollStore for signing)");
 
-    NSBundle *mainBundle = NSBundle.mainBundle;
-    if (!mainBundle)
+    NSBundle *main_bundle = NSBundle.mainBundle;
+    if (!main_bundle)
         ERR(@"mainBundle returned nil for the current app");
 
-    NSString *entitlementsPath = [mainBundle pathForResource:@"entitlements" ofType:@"plist"];
-    if (!entitlementsPath)
+    NSString *entitlements_path = [main_bundle pathForResource:@"entitlements" ofType:@"plist"];
+    if (!entitlements_path)
         ERR(@"entitlements.plist could not be found in the current bundle for signing ldid");
 
-    NSString *signFlag = [NSString stringWithFormat:@"-S%@", entitlementsPath];
+    NSString *sign_flag = [NSString stringWithFormat:@"-S%@", entitlements_path];
 
-    NSString *ldidPath = [trollstorePath stringByAppendingPathComponent:@"ldid"];
+    NSString *ldid_path = [trollstore_path stringByAppendingPathComponent:@"ldid"];
 
-    if (![NSFileManager.defaultManager fileExistsAtPath:ldidPath])
-        ERR(@"ldid doesn't exist at %@", ldidPath);
+    if (![NSFileManager.defaultManager fileExistsAtPath:ldid_path])
+        ERR(@"ldid doesn't exist at %@", ldid_path);
 
-    NSString *ldidErr;
-    NSString *ldidOut;
-    int ldidCode = spawnRoot(ldidPath, @[signFlag, ids_framework_parent_dir()], &ldidOut, &ldidErr);
+    NSString *ldid_err;
+    NSString *ldid_out;
+    int ldid_code = spawnRoot(ldid_path, @[sign_flag, patched_path], &ldid_out, &ldid_err);
 
-    if (ldidCode)
-        ERR(@"Couldn't sign identityservicesd with ldid: %d, %@, %@", ldidCode, ldidErr, ldidOut);
+    if (ldid_code)
+        ERR(@"Couldn't sign identityservicesd with ldid: %d, %@, %@", ldid_code, ldid_err, ldid_out);
 
     int coretrust_ret = apply_coretrust_bypass(patched_path.UTF8String);
     if (coretrust_ret)
         ERR(@"Couldn't apply coretrust bypass to %@: %d", patched_path, coretrust_ret);
 
+    NSString *bundle_path = patched_ids_bundle_path();
+    NSError *move_error;
+    [NSFileManager.defaultManager moveItemAtPath:patched_path toPath:bundle_path error:&move_error];
+    if (move_error)
+        ERR(@"Couldn't move identityservicesd from %@ to %@: %@", patched_path, bundle_path, move_error);
+
+    return bundle_path;
 #undef ERR
 }
 
-NSString * __nonnull force_dylibify_ids(NSError * __nullable * __nullable err) {
-    NSString *framework_dir = ids_framework_parent_dir();
+NSString * __nullable force_dylibify_ids(NSError * __nullable * __nullable err) {
+    NSString *patched_path = patched_ids_docs_path();
+    NSString *bundle_path = patched_ids_bundle_path();
 
-    if ([NSFileManager.defaultManager fileExistsAtPath:framework_dir]) {
-        [NSFileManager.defaultManager removeItemAtPath:framework_dir error:err];
+    if ([NSFileManager.defaultManager fileExistsAtPath:patched_path]) {
+        [NSFileManager.defaultManager removeItemAtPath:patched_path error:err];
 
         if (err && *err)
-            return setup_ids_framework_if_needed(err);
+            return nil;
     }
 
-    NSError * setup_err;
-    NSString *patched_path = setup_ids_framework_if_needed(&setup_err);
-    if (setup_err && err)
-        RET_ERR(err, patched_path, @"%@", setup_err);
+    if ([NSFileManager.defaultManager fileExistsAtPath:bundle_path]) {
+        [NSFileManager.defaultManager removeItemAtPath:bundle_path error:err];
 
-    dylibify_and_sign(identityservicesd_path, patched_path, err);
-    return patched_path;
+        if (err && *err)
+            return nil;
+    }
+
+    return dylibify_and_sign(identityservicesd_path, patched_path, err);
 }
 
-NSString * __nonnull dylibify_ids_if_needed(NSError * __nullable * __nullable err) {
-    NSError *setup_err;
-    NSString *patched_path = setup_ids_framework_if_needed(&setup_err);
-    if (setup_err)
-        RET_ERR(err, patched_path, @"%@", setup_err);
+NSString * __nullable dylibify_ids_if_needed(NSError * __nullable * __nullable err) {
+    NSString *bundle_path = patched_ids_bundle_path();
+    if ([NSFileManager.defaultManager fileExistsAtPath:bundle_path])
+        return bundle_path;
 
-    if ([NSFileManager.defaultManager fileExistsAtPath:patched_path])
-        return patched_path;
-
-    dylibify_and_sign(identityservicesd_path, patched_path, err);
-    return patched_path;
+    // we force_dylibify if it doesn't exist so both paths get cleared out
+    return force_dylibify_ids(err);
 }
 
 

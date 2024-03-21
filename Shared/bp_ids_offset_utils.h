@@ -24,9 +24,9 @@ typedef int nac_sign_fn(void * __nonnull, void * __nullable, int, void * __nulla
 
 static NSString * __nonnull identityservicesd_path = @"/System/Library/PrivateFrameworks/IDS.framework/identityservicesd.app/identityservicesd";
 
-NSString * __nonnull setup_ids_framework_if_needed(NSError * __nullable * __nullable);
-NSString * __nonnull force_dylibify_ids(NSError * __nullable * __nullable);
-NSString * __nonnull dylibify_ids_if_needed(NSError * __nullable * __nullable);
+// NSString * __nonnull setup_ids_framework_if_needed(NSError * __nullable * __nullable);
+NSString * __nullable force_dylibify_ids(NSError * __nullable * __nullable);
+NSString * __nullable dylibify_ids_if_needed(NSError * __nullable * __nullable);
 unsigned long bp_get_image_file_size(NSError * __nullable * __nullable error, NSString * __nonnull path);
 void bp_find_offsets_within_buffer(NSError * __nullable * __nullable error, intptr_t ref_addr, unsigned long image_size);
 void bp_find_offsets(NSError * __nullable * __nullable, NSString * __nonnull);

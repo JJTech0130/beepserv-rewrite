@@ -10,8 +10,8 @@
 #define LOG(...) bp_log_impl(@"Shared", [NSString stringWithFormat: __VA_ARGS__])
 void bp_log_impl(NSString* moduleName, NSString* logString);
 
-static NSString* stateFilePath = ROOT_PATH_NS(@"/var/mobile/.beepserv_state");
-static NSString* alternativeStateFilePath = ROOT_PATH_NS(@"/var/mobile/Library/.beepserv_state");
+#define stateFilePath ROOT_PATH_NS(@"/var/mobile/.beepserv_state")
+#define alternativeStateFilePath ROOT_PATH_NS(@"/var/mobile/Library/.beepserv_state")
 
 static const NSString* kSerializationKeyCode = @"com.beepserv.code";
 static const NSString* kSerializationKeySecret = @"com.beepserv.secret";

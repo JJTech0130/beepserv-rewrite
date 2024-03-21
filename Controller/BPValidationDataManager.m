@@ -150,13 +150,11 @@ BPValidationDataManager* _sharedInstance;
         int ret = _NSGetExecutablePath(exec_path_buf, &alloc_size);
 
         if (ret) {
-            LOG(@"ret for exec is %d", ret);
             offset_err = [NSError errorWithDomain:@"com.beeper.beepserv" code:1 userInfo:@{
                 @"Error Reason": [NSString stringWithFormat:@"_NSGetExecutablePath returned %d", ret]
             }];
         } else {
             NSString *path = [NSString stringWithCString:exec_path_buf encoding:NSUTF8StringEncoding];
-            LOG(@"path for argv[0] is %@", path);
 
             NSString *stdout;
             NSString *stderr;
@@ -164,12 +162,15 @@ BPValidationDataManager* _sharedInstance;
 
             LOG(@"ret_code: %d, stdout: %@, stderr: %@", ret_code, stdout, stderr);
 
-            if (ret_code != 0 || [stderr length] > 0)
+            if (ret_code != 0) {
                 offset_err = [NSError errorWithDomain:@"com.beeper.beepserv" code:2 userInfo:@{
                     @"Error Reason": stderr
                 }];
-            else
-                offset_data = [NSData.alloc initWithBase64EncodedString:stdout options:0];
+            } else {
+                offset_data = [NSData.alloc initWithBase64EncodedString:stderr options:0];
+                LOG(@"Got good output from executing app as root! %@", offset_data);
+            }
+
         }
 
         free(exec_path_buf);

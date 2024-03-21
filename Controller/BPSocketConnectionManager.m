@@ -8,8 +8,8 @@
 #import "./Logging.h"
 #import <rootless.h>
 
-static NSString* relayURLFilePath = ROOT_PATH_NS(@"/var/mobile/.beepserv_relay_url");
-static NSString* alternativeRelayURLFilePath = ROOT_PATH_NS(@"/.beepserv_wsurl");
+#define relayURLFilePath ROOT_PATH_NS(@"/var/mobile/.beepserv_relay_url")
+#define alternativeRelayURLFilePath ROOT_PATH_NS(@"/.beepserv_wsurl")
 
 static BPSocketConnectionManager* _sharedInstance;
 

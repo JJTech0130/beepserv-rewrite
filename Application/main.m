@@ -11,7 +11,8 @@ int main(int argc, char* argv[]) {
             fprintf(stderr, "Couldn't get validation data from within spawned root binary: %s\n", err.description.UTF8String);
             return 1;
         } else {
-            printf("%s", [data base64EncodedStringWithOptions:0].UTF8String);
+            // we use stderr here so that normal logging calls to printf aren't included
+            fprintf(stderr, "%s", [data base64EncodedStringWithOptions:0].UTF8String);
             return 0;
         }
     }

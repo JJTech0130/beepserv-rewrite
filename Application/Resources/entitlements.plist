@@ -65,9 +65,7 @@
         <string>AGXDeviceUserClient</string>
         <string>IOSurfaceRootUserClient</string>
     </array>
-    <!--<key>seatbelt-profiles</key>
-    <array>
-        <string>identityservicesd</string>
-    </array>-->
+    <key>com.apple.private.security.storage.AppBundles</key>
+    <true/>
 </dict>
 </plist>

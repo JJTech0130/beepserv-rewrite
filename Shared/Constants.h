@@ -3,7 +3,7 @@
 
 static NSString* kSuiteName = @"com.beeper.beepserv";
 
-static NSString* kLogFilePath = ROOT_PATH_NS(@"/var/mobile/beepserv.log");
+#define kLogFilePath ROOT_PATH_NS(@"/var/mobile/beepserv.log")
 
 static NSString* kModuleNameApplication = @"Application";
 static NSString* kModuleNameController = @"Controller";
@@ -47,7 +47,7 @@ static const NSString* kNotificationSpringBoardRestarted = @"com.beeper.beepserv
 static const NSString* kNotificationLogEntryFromIdentityServices = @"com.beeper.beepserv/logEntryFromIdentityServices";
 static const NSString* kNotificationKillDaemon = @"com.beeper.beepserv/killDaemon";
 
-static const NSString* kPrefsFilePath = ROOT_PATH_NS(@"/var/mobile/.beepserv_prefs");
+#define kPrefsFilePath ROOT_PATH_NS(@"/var/mobile/.beepserv_prefs")
 
 static const NSString* kPrefsKeyShouldShowNotifications = @"shouldShowNotifications";
 static const NSString* kPrefsKeyUseTrollstoreMode = @"useTrollstoreMode";
